@@ -6,14 +6,15 @@ use Illuminate\Support\Facades\Http;
 
 class OAuthService
 {
-    public function authorizationUrl(string $redirectUri): string
+    public function authorizationUrl(string $redirectUri, ?string $state = null): string
     {
-        $query = http_build_query([
+        $query = http_build_query(array_filter([
             'client_id'     => config('services.auth.client_id'),
             'redirect_uri'  => $redirectUri,
             'response_type' => 'code',
             'scope'         => implode(' ', (array) config('services.auth.scopes')),
-        ]);
+            'state'         => $state,
+        ], fn ($value) => $value !== null && $value !== ''));
 
         return rtrim((string) config('services.auth.server'), '/') . '/oauth/authorize?' . $query;
     }
@@ -21,7 +22,7 @@ class OAuthService
     public function exchangeCode(string $code, string $redirectUri): array
     {
         return Http::post(
-            rtrim((string) config('services.auth.server_internal'), '/') . '/oauth/token',
+            rtrim((string) config('services.auth.server'), '/') . '/oauth/token',
             [
                 'grant_type'    => 'authorization_code',
                 'client_id'     => config('services.auth.client_id'),
@@ -35,7 +36,7 @@ class OAuthService
     public function refreshToken(string $refreshToken): array
     {
         return Http::post(
-            rtrim((string) config('services.auth.server_internal'), '/') . '/oauth/token',
+            rtrim((string) config('services.auth.server'), '/') . '/oauth/token',
             [
                 'grant_type'    => 'refresh_token',
                 'refresh_token' => $refreshToken,
@@ -48,7 +49,7 @@ class OAuthService
     public function fetchUser(string $accessToken): array
     {
         return Http::withToken($accessToken)
-            ->get(rtrim((string) config('services.console.api_url'), '/') . '/user')
+            ->get(rtrim((string) config('services.auth.server'), '/') . '/api/user')
             ->throw()
             ->json();
     }

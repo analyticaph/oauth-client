@@ -5,7 +5,6 @@ namespace SmartCampus\OAuthClient\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use SmartCampus\OAuthClient\Services\OAuthService;
-use SmartCampus\OAuthClient\Services\RolePermissionSyncService;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
@@ -13,27 +12,28 @@ class ValidateOAuthToken
 {
     public function __construct(
         private readonly OAuthService $oauth,
-        private readonly RolePermissionSyncService $sync,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
         $accessToken = $this->oauth->getAccessToken();
 
-        if (!$accessToken) {
+        if (! $accessToken) {
             return $this->redirectToLogin($request);
         }
 
         if ($this->oauth->isExpired()) {
             $refreshToken = $this->oauth->getRefreshToken();
 
-            if (!$refreshToken) {
+            if (! $refreshToken) {
                 $this->clearAndForget();
+
                 return $this->redirectToLogin($request);
             }
 
-            if (!$this->attemptRefresh($refreshToken)) {
+            if (! $this->attemptRefresh($refreshToken)) {
                 $this->clearAndForget();
+
                 return $this->redirectToLogin($request);
             }
         }
@@ -48,9 +48,6 @@ class ValidateOAuthToken
 
             $this->oauth->storeTokens($tokens);
 
-            $user = $this->oauth->fetchUser($tokens['access_token']);
-            $this->sync->sync($user);
-
             return true;
         } catch (Throwable) {
             return false;
@@ -60,7 +57,6 @@ class ValidateOAuthToken
     private function clearAndForget(): void
     {
         $this->oauth->clearTokens();
-        $this->sync->clear();
     }
 
     private function redirectToLogin(Request $request): Response
