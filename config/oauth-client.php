@@ -16,16 +16,22 @@ return [
     'login_route' => 'auth.redirect',
 
     /*
+     * Route name of the host app's OAuth callback.
+     */
+    'callback_route' => 'oauth.callback',
+
+    /*
+     * Route names used by the package OAuth controller after callback/logout.
+     */
+    'after_login_route' => 'dashboard',
+    'after_logout_route' => 'home',
+    'error_route' => 'home',
+
+    /*
      * Session key under which the token data (access_token, refresh_token,
      * expires_at) is stored.
      */
     'token_session_key' => 'oauth_token',
-
-    /*
-     * Session key under which the synced user profile (id, name, roles,
-     * permissions) is stored by RolePermissionSyncService.
-     */
-    'user_session_key' => 'oauth_user',
 
     /*
      * Seconds before expiry to treat the token as expired and attempt a refresh.

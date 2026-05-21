@@ -1,6 +1,6 @@
 {
     "name": "smartcampus/oauth-client",
-    "description": "Shared OAuth 2.0 client — token exchange, middleware, and role/permission sync for SmartCampus tenant apps.",
+    "description": "Shared OAuth 2.0 client flow, token exchange, and middleware for SmartCampus tenant apps.",
     "type": "library",
     "license": "MIT",
     "require": {
