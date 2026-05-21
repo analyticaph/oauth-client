@@ -1,14 +1,14 @@
 <?php
 
-namespace SmartCampus\OAuthClient\Http\Controllers;
+namespace Analyticaph\OAuthClient\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use SmartCampus\OAuthClient\Contracts\OAuthUserResolver;
-use SmartCampus\OAuthClient\Services\OAuthService;
+use Analyticaph\OAuthClient\Contracts\OAuthUserResolver;
+use Analyticaph\OAuthClient\Services\OAuthService;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 

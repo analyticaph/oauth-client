@@ -1,6 +1,6 @@
 <?php
 
-namespace SmartCampus\OAuthClient\Contracts;
+namespace Analyticaph\OAuthClient\Contracts;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 
