@@ -1,10 +1,10 @@
 <?php
 
-namespace SmartCampus\OAuthClient\Http\Middleware;
+namespace Analyticaph\OAuthClient\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use SmartCampus\OAuthClient\Services\OAuthService;
+use Analyticaph\OAuthClient\Services\OAuthService;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 

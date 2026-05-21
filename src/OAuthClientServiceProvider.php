@@ -1,10 +1,10 @@
 <?php
 
-namespace SmartCampus\OAuthClient;
+namespace Analyticaph\OAuthClient;
 
 use Illuminate\Support\ServiceProvider;
-use SmartCampus\OAuthClient\Http\Middleware\ValidateOAuthToken;
-use SmartCampus\OAuthClient\Services\OAuthService;
+use Analyticaph\OAuthClient\Http\Middleware\ValidateOAuthToken;
+use Analyticaph\OAuthClient\Services\OAuthService;
 
 class OAuthClientServiceProvider extends ServiceProvider
 {

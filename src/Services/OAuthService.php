@@ -1,6 +1,6 @@
 <?php
 
-namespace SmartCampus\OAuthClient\Services;
+namespace Analyticaph\OAuthClient\Services;
 
 use Illuminate\Support\Facades\Http;
 

@@ -16,18 +16,18 @@
   },
   "autoload": {
     "psr-4": {
-      "SmartCampus\\OAuthClient\\": "src/"
+      "Analyticaph\\OAuthClient\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "SmartCampus\\OAuthClient\\Tests\\": "tests/"
+      "Analyticaph\\OAuthClient\\Tests\\": "tests/"
     }
   },
   "extra": {
     "laravel": {
       "providers": [
-        "SmartCampus\\OAuthClient\\OAuthClientServiceProvider"
+        "Analyticaph\\OAuthClient\\OAuthClientServiceProvider"
       ]
     }
   },
