@@ -16,9 +16,10 @@ return [
     'login_route' => 'auth.redirect',
 
     /*
-     * Route name of the host app's OAuth callback.
+     * Full URL of the auth server's handoff redemption API endpoint (no trailing slash).
+     * Example: https://auth.example.com/api/oauth/handoff
      */
-    'callback_route' => 'oauth.callback',
+    'handoff_endpoint' => env('OAUTH_HANDOFF_ENDPOINT', ''),
 
     /*
      * Route names used by the package OAuth controller after callback/logout.
