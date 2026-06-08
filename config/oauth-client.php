@@ -13,7 +13,7 @@ return [
      * Route name of the host app's login action (OAuthController::redirect).
      * The middleware redirects unauthenticated requests here.
      */
-    'login_route' => 'auth.redirect',
+    'login_route' => 'login',
 
     /*
      * Full URL of the auth server's handoff redemption API endpoint (no trailing slash).
