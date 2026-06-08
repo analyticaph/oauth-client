@@ -38,6 +38,27 @@ class ValidateOAuthToken
             }
         }
 
+        $claims = $this->oauth->validateJwtLocally();
+
+        if ($claims === null) {
+            $this->clearAndForget();
+
+            return $this->redirectToLogin($request);
+        }
+
+        $jti = $claims['jti'] ?? null;
+        if ($jti !== null && $this->oauth->isRevoked((string) $jti)) {
+            $this->clearAndForget();
+
+            return $this->redirectToLogin($request);
+        }
+
+        if (! $this->oauth->isTokenValidOnServer()) {
+            $this->clearAndForget();
+
+            return $this->redirectToLogin($request);
+        }
+
         return $next($request);
     }
 

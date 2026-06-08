@@ -24,5 +24,7 @@ class OAuthClientServiceProvider extends ServiceProvider
         }
 
         $this->app['router']->aliasMiddleware('oauth.validate', ValidateOAuthToken::class);
+
+        $this->loadRoutesFrom(__DIR__.'/../routes/webhook.php');
     }
 }

@@ -40,4 +40,31 @@ return [
      */
     'refresh_buffer_seconds' => 60,
 
+    /*
+     * How often (in seconds) the middleware verifies the access token against
+     * the auth server's /api/user endpoint. This detects server-side revocation
+     * (e.g. logout from another app) between refresh cycles.
+     * Set to 0 to verify on every request (more secure, more traffic).
+     */
+    'server_verify_interval_seconds' => env('OAUTH_SERVER_VERIFY_INTERVAL', 300),
+
+    /*
+     * Shared secret used to verify HMAC-SHA256 signatures on incoming webhook
+     * payloads from the auth server. Set OAUTH_WEBHOOK_SECRET in the host app.
+     */
+    'webhook_secret' => env('OAUTH_WEBHOOK_SECRET', ''),
+
+    /*
+     * How long (in seconds) to cache the JWKS public-key set fetched from the
+     * auth server's /oauth/jwks endpoint. Default: 1 hour.
+     */
+    'jwks_cache_ttl' => env('OAUTH_JWKS_CACHE_TTL', 3600),
+
+    /*
+     * How long (in seconds) to keep a revoked token JTI in the cache after a
+     * revocation webhook is received. Should be >= the longest token lifetime.
+     * Default: 24 hours.
+     */
+    'revoked_token_ttl' => env('OAUTH_REVOKED_TOKEN_TTL', 86400),
+
 ];

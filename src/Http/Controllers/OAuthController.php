@@ -33,9 +33,9 @@ class OAuthController
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        $afterLogout = urlencode(route((string) config('oauth-client.after_logout_route')));
         $appSlug = urlencode((string) config('oauth-client.app_slug'));
-        $authLogoutUrl = rtrim((string) config('services.auth.server'), '/').'/logout?redirect='.$afterLogout.'&app_slug='.$appSlug;
+        $afterLogout = urlencode(route((string) config('oauth-client.after_logout_route')));
+        $authLogoutUrl = rtrim((string) config('services.auth.server'), '/').'/logout?app_slug='.$appSlug.'&redirect='.$afterLogout;
 
         return redirect()->away($authLogoutUrl);
     }
