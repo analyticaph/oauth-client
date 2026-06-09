@@ -15,7 +15,7 @@ class WebhookController
     public function revoke(Request $request): JsonResponse
     {
         $secret = (string) config('oauth-client.webhook_secret');
-        $signature = (string) $request->header('X-Signature-256', '');
+        $signature = (string) $request->header('X-Webhook-Signature', '');
 
         if (! $this->verifySignature($request->getContent(), $signature, $secret)) {
             return response()->json(['message' => 'Unauthorized.'], 401);

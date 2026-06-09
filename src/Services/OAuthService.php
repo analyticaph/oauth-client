@@ -32,7 +32,7 @@ class OAuthService
             'state'         => $state,
             'device_hint'   => $deviceType,
             'device_id'     => request()->cookie('sc_device_id') ?? request()->query('device_id'),
-        ], fn ($v) => $v !== null && $v !== ''));
+        ], fn($v) => $v !== null && $v !== ''));
 
         return rtrim((string) config('services.auth.server'), '/') . '/oauth/authorize?' . $query;
     }
@@ -131,35 +131,6 @@ class OAuthService
             true,
             (int) config('oauth-client.revoked_token_ttl', 86400)
         );
-    }
-
-    public function isTokenValidOnServer(): bool
-    {
-        $stored = $this->stored();
-        $lastVerified = (int) ($stored['server_verified_at'] ?? 0);
-        $interval = (int) config('oauth-client.server_verify_interval_seconds', 300);
-
-        if ($interval > 0 && now()->timestamp - $lastVerified < $interval) {
-            return true;
-        }
-
-        $accessToken = $this->getAccessToken();
-        if (! $accessToken) {
-            return false;
-        }
-
-        $response = Http::withToken($accessToken)
-            ->get(rtrim((string) config('services.auth.server'), '/') . '/api/user');
-
-        if ($response->successful()) {
-            $key = (string) config('oauth-client.token_session_key');
-            $current = session($key, []);
-            $current['server_verified_at'] = now()->timestamp;
-            session([$key => $current]);
-            return true;
-        }
-
-        return false;
     }
 
     private function fetchJwks(): ?array

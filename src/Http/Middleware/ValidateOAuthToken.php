@@ -53,12 +53,6 @@ class ValidateOAuthToken
             return $this->redirectToLogin($request);
         }
 
-        if (! $this->oauth->isTokenValidOnServer()) {
-            $this->clearAndForget();
-
-            return $this->redirectToLogin($request);
-        }
-
         return $next($request);
     }
 

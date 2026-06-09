@@ -41,14 +41,6 @@ return [
     'refresh_buffer_seconds' => 60,
 
     /*
-     * How often (in seconds) the middleware verifies the access token against
-     * the auth server's /api/user endpoint. This detects server-side revocation
-     * (e.g. logout from another app) between refresh cycles.
-     * Set to 0 to verify on every request (more secure, more traffic).
-     */
-    'server_verify_interval_seconds' => env('OAUTH_SERVER_VERIFY_INTERVAL', 300),
-
-    /*
      * Shared secret used to verify HMAC-SHA256 signatures on incoming webhook
      * payloads from the auth server. Set OAUTH_WEBHOOK_SECRET in the host app.
      */
