@@ -110,7 +110,7 @@ class OAuthService
         }
 
         try {
-            $keySet = JWK::parseKeySet($jwks);
+            $keySet = JWK::parseKeySet($jwks, 'RS256');
             $claims = (array) JWT::decode($token, $keySet);
 
             return $claims;
