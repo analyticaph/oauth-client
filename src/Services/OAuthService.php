@@ -100,10 +100,21 @@ class OAuthService
     public function validateJwtLocally(): ?array
     {
         $token = $this->getAccessToken();
-        if (! $token) {
-            return null;
-        }
 
+        return $token ? $this->verifyBearerToken($token) : null;
+    }
+
+    /**
+     * Verify an arbitrary bearer token string (not session-bound) locally using the
+     * JWKS public-key set. For stateless API consumers with no HTTP session.
+     * Returns the decoded claims on success, or null on any failure (invalid
+     * signature, malformed token, or expiry — JWT::decode() throws on an expired
+     * `exp` claim, caught below).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function verifyBearerToken(string $token): ?array
+    {
         $jwks = $this->fetchJwks();
         if (! $jwks) {
             return null;
@@ -111,9 +122,8 @@ class OAuthService
 
         try {
             $keySet = JWK::parseKeySet($jwks, 'RS256');
-            $claims = (array) JWT::decode($token, $keySet);
 
-            return $claims;
+            return (array) JWT::decode($token, $keySet);
         } catch (\Throwable) {
             return null;
         }
