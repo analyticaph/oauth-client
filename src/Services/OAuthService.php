@@ -16,6 +16,8 @@ class OAuthService
     private const JWKS_LAST_GOOD_CACHE_KEY = 'oauth:jwks:last_good';
     private const JWKS_BACKOFF_CACHE_KEY = 'oauth:jwks:backoff';
     private const JWKS_BACKOFF_SECONDS = 60;
+    private const JWKS_REFRESH_LOCK_KEY = 'oauth:jwks:refresh';
+    private const JWKS_REFRESH_LOCK_SECONDS = 10;
 
     public function authorizationUrl(string $finalUrl): string
     {
@@ -151,10 +153,17 @@ class OAuthService
     }
 
     /**
-     * Fetch the JWKS, cached for jwks_cache_ttl. If a refetch fails, fall back to
-     * the last key set that was fetched successfully and skip refetching for
-     * JWKS_BACKOFF_SECONDS, so an unreachable auth server doesn't cost a timeout
-     * on every request.
+     * Fetch the JWKS, cached for jwks_cache_ttl (stale-while-revalidate).
+     *
+     * When the cached set has expired but a last-good copy exists, that copy is
+     * returned immediately. The one request that wins the refresh lock schedules a
+     * refetch to run after its response is sent, so no request waits on the auth
+     * server. terminating() is used rather than defer() because Laravel 10 is
+     * still supported.
+     *
+     * With no last-good copy (cold start or cache flush), the fetch happens
+     * synchronously. A failed fetch skips refetching for JWKS_BACKOFF_SECONDS, so
+     * an unreachable auth server doesn't cost a timeout on every request.
      */
     private function fetchJwks(): ?array
     {
@@ -163,10 +172,38 @@ class OAuthService
             return $cached;
         }
 
-        if (Cache::has(self::JWKS_BACKOFF_CACHE_KEY)) {
-            return Cache::get(self::JWKS_LAST_GOOD_CACHE_KEY);
+        $lastGood = Cache::get(self::JWKS_LAST_GOOD_CACHE_KEY);
+        if ($lastGood !== null) {
+            if (! Cache::has(self::JWKS_BACKOFF_CACHE_KEY)) {
+                $lock = Cache::lock(self::JWKS_REFRESH_LOCK_KEY, self::JWKS_REFRESH_LOCK_SECONDS);
+
+                if ($lock->get()) {
+                    app()->terminating(function () use ($lock) {
+                        try {
+                            $this->refreshJwks();
+                        } finally {
+                            $lock->release();
+                        }
+                    });
+                }
+            }
+
+            return $lastGood;
         }
 
+        if (Cache::has(self::JWKS_BACKOFF_CACHE_KEY)) {
+            return null;
+        }
+
+        return $this->refreshJwks();
+    }
+
+    /**
+     * Fetch the JWKS from the auth server and store it as both the fresh and the
+     * last-good copy. On failure, set the backoff flag and return null.
+     */
+    private function refreshJwks(): ?array
+    {
         try {
             $response = $this->authServer()->get(rtrim((string) config('services.auth.server'), '/') . '/oauth/jwks');
             $jwks = $response->successful() ? $response->json() : null;
@@ -177,10 +214,10 @@ class OAuthService
         if (! is_array($jwks)) {
             Cache::put(self::JWKS_BACKOFF_CACHE_KEY, true, self::JWKS_BACKOFF_SECONDS);
 
-            return Cache::get(self::JWKS_LAST_GOOD_CACHE_KEY);
+            return null;
         }
 
-        Cache::put(self::JWKS_CACHE_KEY, $jwks, (int) config('oauth-client.jwks_cache_ttl', 3600));
+        Cache::put(self::JWKS_CACHE_KEY, $jwks, (int) config('oauth-client.jwks_cache_ttl', 86400));
         Cache::forever(self::JWKS_LAST_GOOD_CACHE_KEY, $jwks);
 
         return $jwks;

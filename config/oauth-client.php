@@ -48,9 +48,11 @@ return [
 
     /*
      * How long (in seconds) to cache the JWKS public-key set fetched from the
-     * auth server's /oauth/jwks endpoint. Default: 1 hour.
+     * auth server's /oauth/jwks endpoint. Default: 24 hours. Once expired, the
+     * last-good set is still served while one request refreshes it in the
+     * background after its response is sent.
      */
-    'jwks_cache_ttl' => env('OAUTH_JWKS_CACHE_TTL', 3600),
+    'jwks_cache_ttl' => env('OAUTH_JWKS_CACHE_TTL', 86400),
 
     /*
      * How long (in seconds) to keep a revoked token JTI in the cache after a
