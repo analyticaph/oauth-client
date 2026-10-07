@@ -4,12 +4,19 @@ namespace Analyticaph\OAuthClient\Services;
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\JWK;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class OAuthService
 {
+    private const JWKS_CACHE_KEY = 'oauth:jwks';
+    private const JWKS_LAST_GOOD_CACHE_KEY = 'oauth:jwks:last_good';
+    private const JWKS_BACKOFF_CACHE_KEY = 'oauth:jwks:backoff';
+    private const JWKS_BACKOFF_SECONDS = 60;
+
     public function authorizationUrl(string $finalUrl): string
     {
         $nonce = Str::random(40);
@@ -39,7 +46,7 @@ class OAuthService
 
     public function refreshToken(string $refreshToken): array
     {
-        return Http::post(
+        return $this->authServer()->post(
             rtrim((string) config('services.auth.server'), '/') . '/oauth/token',
             [
                 'grant_type'    => 'refresh_token',
@@ -143,22 +150,45 @@ class OAuthService
         );
     }
 
+    /**
+     * Fetch the JWKS, cached for jwks_cache_ttl. If a refetch fails, fall back to
+     * the last key set that was fetched successfully and skip refetching for
+     * JWKS_BACKOFF_SECONDS, so an unreachable auth server doesn't cost a timeout
+     * on every request.
+     */
     private function fetchJwks(): ?array
     {
-        $cached = Cache::get('oauth:jwks');
+        $cached = Cache::get(self::JWKS_CACHE_KEY);
         if ($cached !== null) {
             return $cached;
         }
 
-        $response = Http::get(rtrim((string) config('services.auth.server'), '/') . '/oauth/jwks');
-        if (! $response->successful()) {
-            return null;
+        if (Cache::has(self::JWKS_BACKOFF_CACHE_KEY)) {
+            return Cache::get(self::JWKS_LAST_GOOD_CACHE_KEY);
         }
 
-        $jwks = $response->json();
-        Cache::put('oauth:jwks', $jwks, (int) config('oauth-client.jwks_cache_ttl', 3600));
+        try {
+            $response = $this->authServer()->get(rtrim((string) config('services.auth.server'), '/') . '/oauth/jwks');
+            $jwks = $response->successful() ? $response->json() : null;
+        } catch (ConnectionException) {
+            $jwks = null;
+        }
+
+        if (! is_array($jwks)) {
+            Cache::put(self::JWKS_BACKOFF_CACHE_KEY, true, self::JWKS_BACKOFF_SECONDS);
+
+            return Cache::get(self::JWKS_LAST_GOOD_CACHE_KEY);
+        }
+
+        Cache::put(self::JWKS_CACHE_KEY, $jwks, (int) config('oauth-client.jwks_cache_ttl', 3600));
+        Cache::forever(self::JWKS_LAST_GOOD_CACHE_KEY, $jwks);
 
         return $jwks;
+    }
+
+    private function authServer(): PendingRequest
+    {
+        return Http::connectTimeout(2)->timeout(5);
     }
 
     private function revokedCacheKey(string $jti): string
