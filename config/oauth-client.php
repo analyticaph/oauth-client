@@ -61,4 +61,14 @@ return [
      */
     'revoked_token_ttl' => env('OAUTH_REVOKED_TOKEN_TTL', 86400),
 
+    /*
+     * Cache store (a key in config('cache.stores')) for revoked token JTIs,
+     * the JWKS and token-refresh locks. In multi-tenant apps that re-prefix
+     * the default store per tenant (spatie PrefixCacheTask), point this at a
+     * store with its own fixed `prefix`; otherwise the revoke webhook (no
+     * tenant) and tenant requests read different keys and revocations are
+     * missed. Null uses the default store.
+     */
+    'cache_store' => env('OAUTH_CACHE_STORE'),
+
 ];

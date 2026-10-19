@@ -5,6 +5,7 @@ namespace Analyticaph\OAuthClient\Http\Middleware;
 use Analyticaph\OAuthClient\Services\OAuthService;
 use Analyticaph\OAuthClient\Support\ExpiredSessionResponse;
 use Closure;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -58,13 +59,14 @@ class EnsureOAuthSessionActive
         }
 
         try {
-            $tokens = $this->oauth->refreshToken($refreshToken);
+            $tokens = $this->oauth->refreshStoredTokens($refreshToken);
             $this->oauth->storeTokens($tokens);
 
             return true;
-        } catch (ConnectionException) {
-            // Auth server unreachable — keep the session rather than logging
-            // everyone out during an outage; the JWT check below still applies.
+        } catch (ConnectionException|LockTimeoutException) {
+            // Auth server unreachable, or a concurrent refresh never finished —
+            // keep the session rather than logging the user out; the JWT check
+            // below still rejects a token that has actually expired.
             return true;
         } catch (Throwable) {
             return false;

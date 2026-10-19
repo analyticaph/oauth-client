@@ -3,6 +3,8 @@
 namespace Analyticaph\OAuthClient\Http\Middleware;
 
 use Closure;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Analyticaph\OAuthClient\Services\OAuthService;
 use Symfony\Component\HttpFoundation\Response;
@@ -59,10 +61,15 @@ class ValidateOAuthToken
     private function attemptRefresh(string $refreshToken): bool
     {
         try {
-            $tokens = $this->oauth->refreshToken($refreshToken);
+            $tokens = $this->oauth->refreshStoredTokens($refreshToken);
 
             $this->oauth->storeTokens($tokens);
 
+            return true;
+        } catch (ConnectionException|LockTimeoutException) {
+            // Auth server unreachable, or a concurrent refresh never finished —
+            // keep the session; the JWT check after this still rejects a token
+            // that has actually expired.
             return true;
         } catch (Throwable) {
             return false;

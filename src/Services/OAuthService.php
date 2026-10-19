@@ -4,6 +4,7 @@ namespace Analyticaph\OAuthClient\Services;
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\JWK;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
@@ -18,6 +19,9 @@ class OAuthService
     private const JWKS_BACKOFF_SECONDS = 60;
     private const JWKS_REFRESH_LOCK_KEY = 'oauth:jwks:refresh';
     private const JWKS_REFRESH_LOCK_SECONDS = 10;
+    private const TOKEN_REFRESH_LOCK_SECONDS = 15;
+    private const TOKEN_REFRESH_WAIT_SECONDS = 6;
+    private const TOKEN_REFRESH_RESULT_SECONDS = 30;
 
     public function authorizationUrl(string $finalUrl): string
     {
@@ -57,6 +61,42 @@ class OAuthService
                 'client_secret' => config('services.auth.client_secret'),
             ]
         )->throw()->json();
+    }
+
+    /**
+     * Refresh tokens at most once per refresh token, however many requests ask.
+     *
+     * Concurrent requests from one session (autosave + page load) all carry the
+     * same refresh token once the access token nears expiry. With refresh-token
+     * rotation only the first exchange succeeds, so the rest would fail and log
+     * the user out. The first caller takes a lock and exchanges; the others wait
+     * for it and reuse the result, which is kept briefly for stragglers.
+     *
+     * The wait outlasts the auth-server timeout (5s), so a waiter only gives up
+     * when the lock holder itself died.
+     *
+     * @throws \Illuminate\Http\Client\ConnectionException
+     * @throws \Illuminate\Contracts\Cache\LockTimeoutException
+     */
+    public function refreshStoredTokens(string $refreshToken): array
+    {
+        $key = 'oauth:refresh:' . hash('sha256', $refreshToken);
+
+        if (is_array($tokens = $this->cache()->get("{$key}:result"))) {
+            return $tokens;
+        }
+
+        return $this->cache()->lock("{$key}:lock", self::TOKEN_REFRESH_LOCK_SECONDS)
+            ->block(self::TOKEN_REFRESH_WAIT_SECONDS, function () use ($key, $refreshToken) {
+                if (is_array($tokens = $this->cache()->get("{$key}:result"))) {
+                    return $tokens;
+                }
+
+                $tokens = $this->refreshToken($refreshToken);
+                $this->cache()->put("{$key}:result", $tokens, self::TOKEN_REFRESH_RESULT_SECONDS);
+
+                return $tokens;
+            });
     }
 
     public function storeTokens(array $tokenData): void
@@ -140,12 +180,12 @@ class OAuthService
 
     public function isRevoked(string $jti): bool
     {
-        return Cache::has($this->revokedCacheKey($jti));
+        return $this->cache()->has($this->revokedCacheKey($jti));
     }
 
     public function revokeToken(string $jti): void
     {
-        Cache::put(
+        $this->cache()->put(
             $this->revokedCacheKey($jti),
             true,
             (int) config('oauth-client.revoked_token_ttl', 86400)
@@ -167,15 +207,15 @@ class OAuthService
      */
     private function fetchJwks(): ?array
     {
-        $cached = Cache::get(self::JWKS_CACHE_KEY);
+        $cached = $this->cache()->get(self::JWKS_CACHE_KEY);
         if ($cached !== null) {
             return $cached;
         }
 
-        $lastGood = Cache::get(self::JWKS_LAST_GOOD_CACHE_KEY);
+        $lastGood = $this->cache()->get(self::JWKS_LAST_GOOD_CACHE_KEY);
         if ($lastGood !== null) {
-            if (! Cache::has(self::JWKS_BACKOFF_CACHE_KEY)) {
-                $lock = Cache::lock(self::JWKS_REFRESH_LOCK_KEY, self::JWKS_REFRESH_LOCK_SECONDS);
+            if (! $this->cache()->has(self::JWKS_BACKOFF_CACHE_KEY)) {
+                $lock = $this->cache()->lock(self::JWKS_REFRESH_LOCK_KEY, self::JWKS_REFRESH_LOCK_SECONDS);
 
                 if ($lock->get()) {
                     app()->terminating(function () use ($lock) {
@@ -191,7 +231,7 @@ class OAuthService
             return $lastGood;
         }
 
-        if (Cache::has(self::JWKS_BACKOFF_CACHE_KEY)) {
+        if ($this->cache()->has(self::JWKS_BACKOFF_CACHE_KEY)) {
             return null;
         }
 
@@ -212,15 +252,27 @@ class OAuthService
         }
 
         if (! is_array($jwks)) {
-            Cache::put(self::JWKS_BACKOFF_CACHE_KEY, true, self::JWKS_BACKOFF_SECONDS);
+            $this->cache()->put(self::JWKS_BACKOFF_CACHE_KEY, true, self::JWKS_BACKOFF_SECONDS);
 
             return null;
         }
 
-        Cache::put(self::JWKS_CACHE_KEY, $jwks, (int) config('oauth-client.jwks_cache_ttl', 86400));
-        Cache::forever(self::JWKS_LAST_GOOD_CACHE_KEY, $jwks);
+        $this->cache()->put(self::JWKS_CACHE_KEY, $jwks, (int) config('oauth-client.jwks_cache_ttl', 86400));
+        $this->cache()->forever(self::JWKS_LAST_GOOD_CACHE_KEY, $jwks);
 
         return $jwks;
+    }
+
+    /**
+     * Store for revocations, the JWKS and refresh locks. These must read and
+     * write the same keys whatever tenant is current: the revoke webhook runs
+     * without a tenant, while web requests check revocations after tenancy has
+     * re-prefixed the default store. A store with its own `prefix` keeps one
+     * keyspace. Null falls back to the default store.
+     */
+    private function cache(): Repository
+    {
+        return Cache::store(config('oauth-client.cache_store'));
     }
 
     private function authServer(): PendingRequest
