@@ -21,8 +21,11 @@ Route::get('auth/complete', OAuthFinalizeController::class)
 Route::middleware('auth')->group(function () {
     Route::post('logout', [OAuthController::class, 'logout'])
         ->name('logout');
+});
 
-    Route::get('auth/profile', function () {
+// $profile comes from OAuthClient::routes(); apps with native account settings opt out.
+if ($profile ?? true) {
+    Route::middleware('auth')->get('auth/profile', function () {
         return redirect()->away(rtrim((string) config('services.auth.server'), '/').'/settings');
     })->name('auth.profile');
-});
+}
